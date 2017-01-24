@@ -3,6 +3,7 @@ from sets import Set
 
 import numpy as np
 import random
+import json
 
 # Terminals are
 # N: nouns, pronouns (NN, NNP, NNPS, NNS, PRP, WP)
@@ -16,7 +17,7 @@ import random
 #Non Terminals are numbers
 
 class GeneticEvolution:
-	def __init__(self, terminals=['N','V','J','R','P','T','O'], non_terminals=['0','1','2','3','4','6','7','8']):
+	def __init__(self, terminals=['N','V','J','R','P','T','O'], non_terminals=['0','1','2','3','4','6','7','8'], random_len=100, r_ele_len=20):
 		self.terminals = terminals
 		self.non_terminals = non_terminals
 		self.population = []
@@ -28,6 +29,60 @@ class GeneticEvolution:
 		#evolution coefficients available for tuning
 		self.discount_factor = 0.98 #To avoid generation of large grammars
 		self.penalty_random = 2 #Penalty for accepting random grammar
+		self.random_pop = []
+
+		for x in range(0, random_len):
+			ele = ''
+			for y in range(0, r_ele_len):
+				ele = ele+random.choice(non_terminals)
+			self.random_pop.append(ele)
+
+	def init_population_from_file(self, filename):
+		str=""
+		with open(filename) as f :
+			for x in f:
+				str = str+x
+
+		str = str.split(";")
+		# pop = json.loads(str)
+		pop = []
+		self.population = []
+		for x in range(0,len(str)):
+			self.population.append(json.loads(str[x]))
+		return self.population
+
+
+	def complete_grammar(self, grammar, min_length=10):
+		used_term = Set([])
+		non_used_term = Set([])
+		complete_pool = self.terminals+self.non_terminals
+
+		for x in range(0, len(grammar)):
+			if x%3 == 0:
+				used_term.add(grammar[x])
+			else:
+				if grammar[x].isdigit():
+					if grammar[x] not in used_term:
+						non_used_term.add(grammar[x])
+					else:
+						try:
+							non_used_term.remove(grammar[x])
+						except KeyError:
+							a = None
+
+		it = len(non_used_term)
+
+		for y in range(0, it):
+			x = non_used_term.pop()
+			grammar = grammar+x
+			grammar = grammar+random.choice(complete_pool)
+			grammar = grammar+random.choice(complete_pool)
+
+		if len(grammar) < min_length:
+			add_gram = self.get_random_rules(min_length-len(grammar))
+			grammar = grammar+add_gram
+
+		return grammar
 
 
 	def get_random_rules(self, min_length=10):
@@ -60,7 +115,6 @@ class GeneticEvolution:
 
 		return grammar
 
-
 	def init_population(self, population_limit=10):
 		complete_pool = self.terminals+self.non_terminals
 		random.shuffle(complete_pool)
@@ -73,14 +127,17 @@ class GeneticEvolution:
 			# 		chromosome = chromosome+random.choice(complete_pool)
 			chromosome = self.get_random_rules()
 			self.population.append({ 'chromosome': chromosome, 'fitness': 0.0})
-			
-		print self.population
 
+		return self.population
 
 #Use this function to get the fitness coefficent
-	def get_fitness(self,pop,corpus,r_corpus):
-		p = 7
-		discount = self.discount_factor^(max(0,len(pop)-p))
+	def get_fitness(self, gram, corpus, r_corpus):
+		pop = Set([])
+		for x in range(0, len(gram),3):
+			pop.add(gram[x])
+
+		pop = len(pop)
+		discount = self.discount_factor**(max(0,len(gram)-pop))
 		fitness = discount*corpus - (self.penalty_random*r_corpus)
 		return fitness
 
@@ -90,7 +147,9 @@ class GeneticEvolution:
 		new_gen=[]
 		temp_pop = sorted(self.population, key=lambda y: y['fitness'], reverse=True)
 
-		new_gen.append(self.population[0])
+		# print temp_pop
+
+		new_gen.append(temp_pop[0])
 
 		#Crossover
 		print "starting crossover"		
@@ -102,6 +161,7 @@ class GeneticEvolution:
 				prob = np.random.rand()
 				if prob < cross_prob:
 					val = val[0:y]+self.population[0]['chromosome'][y:3]+val[y+3:]
+			val = self.complete_grammar(val)
 			new_gen.append({'chromosome': val, 'fitness': 0.0})
 
 		print "crossover complete"
@@ -125,6 +185,8 @@ class GeneticEvolution:
 						chromosome = chromosome+random.choice(complete_pool)
 				else:
 					chromosome = chromosome+val[y]
+			
+			chromosome = self.complete_grammar(chromosome)
 			new_gen.append({'chromosome': chromosome, 'fitness': 0.0})
 
 		print "mutation complete"
@@ -132,6 +194,9 @@ class GeneticEvolution:
 
 		self.population = new_gen
 
-		np.random.shuffle(self.population)
+		# for x in self.population:
+		# 	x['chromosome'] = self.complete_grammar(x['chromosome'])
+
+		# np.random.shuffle(self.population)
 
 		return self.population
