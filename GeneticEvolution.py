@@ -27,7 +27,7 @@ class GeneticEvolution:
 		self.generation = 0
 
 		#evolution coefficients available for tuning
-		self.discount_factor = 0.98 #To avoid generation of large grammars
+		self.discount_factor = 0.96 #To avoid generation of large grammars
 		self.penalty_random = 2 #Penalty for accepting random grammar
 		self.random_pop = []
 
@@ -52,10 +52,41 @@ class GeneticEvolution:
 		return self.population
 
 
-	def complete_grammar(self, grammar, min_length=10):
+	def complete_grammar_non_cnf(self, grammar, min_length=10):
 		used_term = Set([])
 		non_used_term = Set([])
 		complete_pool = self.terminals+self.non_terminals
+
+		for x in range(0, len(grammar)):
+			if x%3 == 0:
+				used_term.add(grammar[x])
+			else:
+				if grammar[x].isdigit():
+					if grammar[x] not in used_term:
+						non_used_term.add(grammar[x])
+					else:
+						try:
+							non_used_term.remove(grammar[x])
+						except KeyError:
+							a = None
+
+		it = len(non_used_term)
+
+		for y in range(0, it):
+			x = non_used_term.pop()
+			grammar = grammar+x
+			grammar = grammar+random.choice(complete_pool)
+			grammar = grammar+random.choice(complete_pool)
+
+		if len(grammar) < min_length:
+			add_gram = self.get_random_rules(min_length-len(grammar))
+			grammar = grammar+add_gram
+
+		return grammar
+
+	def complete_grammar(self, grammar, min_length=10):
+		used_term = Set([])
+		non_used_term = Set([])
 
 		for x in range(0, len(grammar)):
 			if x%3 == 0:
@@ -132,12 +163,8 @@ class GeneticEvolution:
 
 #Use this function to get the fitness coefficent
 	def get_fitness(self, gram, corpus, r_corpus):
-		pop = Set([])
-		for x in range(0, len(gram),3):
-			pop.add(gram[x])
-
-		pop = len(pop)
-		discount = self.discount_factor**(max(0,len(gram)-pop))
+		preterm = len(self.terminals)
+		discount = self.discount_factor**(max(0,len(gram)-preterm))
 		fitness = discount*corpus - (self.penalty_random*r_corpus)
 		return fitness
 
@@ -172,7 +199,7 @@ class GeneticEvolution:
 		
 		complete_pool = self.terminals+self.non_terminals
 
-		for x in range(6,10):
+		for x in range(6,9):
 			val = self.population[x]['chromosome']
 			chromosome = ''
 
@@ -191,6 +218,9 @@ class GeneticEvolution:
 
 		print "mutation complete"
 		# print len(new_gen)
+
+		print "Adding extra random individual"
+		new_gen.append({ "chromosome": self.get_random_rules(), "fitness": 0.0 })
 
 		self.population = new_gen
 
