@@ -27,7 +27,7 @@ class GeneticEvolution:
 		self.generation = 0
 
 		#evolution coefficients available for tuning
-		self.discount_factor = 0.96 #To avoid generation of large grammars
+		self.discount_factor = 0.98 #To avoid generation of large grammars
 		self.penalty_random = 2 #Penalty for accepting random grammar
 		self.random_pop = []
 
@@ -84,39 +84,7 @@ class GeneticEvolution:
 
 		return grammar
 
-	def complete_grammar(self, grammar, min_length=10):
-		used_term = Set([])
-		non_used_term = Set([])
-
-		for x in range(0, len(grammar)):
-			if x%3 == 0:
-				used_term.add(grammar[x])
-			else:
-				if grammar[x].isdigit():
-					if grammar[x] not in used_term:
-						non_used_term.add(grammar[x])
-					else:
-						try:
-							non_used_term.remove(grammar[x])
-						except KeyError:
-							a = None
-
-		it = len(non_used_term)
-
-		for y in range(0, it):
-			x = non_used_term.pop()
-			grammar = grammar+x
-			grammar = grammar+random.choice(complete_pool)
-			grammar = grammar+random.choice(complete_pool)
-
-		if len(grammar) < min_length:
-			add_gram = self.get_random_rules(min_length-len(grammar))
-			grammar = grammar+add_gram
-
-		return grammar
-
-
-	def get_random_rules(self, min_length=10):
+	def get_random_rules_non_cnf(self, min_length=20):
 		used_term = Set([])
 		non_used_term = Set([])
 
@@ -146,6 +114,121 @@ class GeneticEvolution:
 
 		return grammar
 
+	def complete_grammar(self, grammar, min_length=10, max_length=20):
+		used_term = Set([])
+		non_used_term = Set([])
+
+		val = ''
+		for x in range(0,len(grammar),3):
+			if grammar[x+1] == ' ' and grammar[x+2] == ' ':
+				a = None
+			else:
+				val=val+grammar[x]+grammar[x+1]+grammar[x+2]
+
+		grammar = val
+		init_len = len(grammar)
+		grammar = str(grammar)
+
+		x = 0
+		while True:
+			x = x+1
+			if grammar[x].isdigit():
+				if not grammar[x+1].isdigit():
+					el = random.choice(self.non_terminals)
+					prod = grammar[x+1]
+					grammar = grammar[:x+1]+el+grammar[x+2:]
+					if prod!=' ':
+						grammar = grammar+el+prod+' '	
+				x = x+2
+			else:
+				grammar=grammar[:x+1]+' '+grammar[x+2:]
+				x = x+2
+
+			if x+2>= init_len:
+				break
+
+		for x in range(0, len(grammar)):
+			if x%3 == 0:
+				used_term.add(grammar[x])
+			else:
+				if grammar[x].isdigit():
+					if grammar[x] not in used_term:
+						non_used_term.add(grammar[x])
+					else:
+						try:
+							non_used_term.remove(grammar[x])
+						except KeyError:
+							a = None
+
+		it = len(non_used_term)
+		ctr = len(grammar)
+
+		for y in range(0, it):
+			x = non_used_term.pop()
+
+			r_prob = np.random.rand()
+
+			if (r_prob >= 0.5 or ctr<min_length) and ctr<max_length:
+				el1 = random.choice(self.non_terminals)
+				el2 = random.choice(self.non_terminals)
+			else:
+				el1 = random.choice(self.terminals)
+				el2 = ' '
+
+			ctr = ctr+3
+			grammar = grammar+x+el1+el2
+			# grammar = grammar+random.choice(complete_pool)
+			# grammar = grammar+random.choice(complete_pool)
+
+		# if len(grammar) < min_length:
+		# 	add_gram = self.get_random_rules(min_length-len(grammar))
+		# 	grammar = grammar+add_gram
+
+		return grammar
+
+	def get_random_rules(self, min_length=10, max_length=20):
+		used_term = Set([])
+		non_used_term = Set([])
+
+		complete_pool = self.terminals+self.non_terminals
+
+		grammar = ''
+		ctr = 0
+
+		while True:
+			if len(non_used_term) == 0:
+				gen = random.choice(self.non_terminals)
+			else:
+				gen = non_used_term.pop()
+			used_term.add(gen)
+			grammar = grammar+gen
+			
+			r_prob = np.random.rand()
+
+			if (r_prob >= 0.5 or ctr<min_length) and ctr<max_length:
+				el1 = random.choice(self.non_terminals)
+				el2 = random.choice(self.non_terminals)
+			else:
+				el1 = random.choice(self.terminals)
+				el2 = ' '
+
+			# el1 = random.choice(complete_pool)
+			# el2 = random.choice(complete_pool)
+
+			if el1 in self.non_terminals and el1 not in used_term:
+				non_used_term.add(el1)
+
+			if el2 in self.non_terminals and el2 not in used_term:
+				non_used_term.add(el2)
+
+			grammar = grammar+el1+el2
+			ctr = ctr+3
+
+			if len(non_used_term) <= 0:
+				break
+
+		return grammar
+
 	def init_population(self, population_limit=10):
 		complete_pool = self.terminals+self.non_terminals
 		random.shuffle(complete_pool)
@@ -169,12 +252,14 @@ class GeneticEvolution:
 		return fitness
 
 
-	def get_next_generation(self):
+	def get_next_generation(self,min_length=10):
 		self.generation = self.generation+1
 		new_gen=[]
 		temp_pop = sorted(self.population, key=lambda y: y['fitness'], reverse=True)
 
 		# print temp_pop
+
+		temp_pop[0] = {'chromosome': self.complete_grammar(temp_pop[0]['chromosome']), 'fitness': 0.0}
 
 		new_gen.append(temp_pop[0])
 
@@ -198,21 +283,32 @@ class GeneticEvolution:
 		print "Mutation starting"
 		
 		complete_pool = self.terminals+self.non_terminals
+		purge_probability = 0.02
 
 		for x in range(6,9):
 			val = self.population[x]['chromosome']
 			chromosome = ''
+			y = 0
 
-			for y in range(0,len(val)):
+			while True:
+				if y >= len(val):
+					break
 				prob = np.random.rand()
-				if prob < self.mutation_prob: 
+				if prob < self.mutation_prob:
 					if y%3 == 0:
-						chromosome = chromosome+random.choice(self.non_terminals)
+						prob = np.random.rand()
+						if prob < purge_probability and len(val) > min_length+3:
+							# chromosome = val[:y]+val[y+3:]
+							y = y+3
+						else:
+							chromosome = chromosome+random.choice(self.non_terminals)
+							y=y+1
 					else:
 						chromosome = chromosome+random.choice(complete_pool)
+						y = y+1
 				else:
 					chromosome = chromosome+val[y]
-			
+					y = y+1
 			chromosome = self.complete_grammar(chromosome)
 			new_gen.append({'chromosome': chromosome, 'fitness': 0.0})
 

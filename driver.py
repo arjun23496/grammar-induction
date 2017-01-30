@@ -21,7 +21,7 @@ def check_grammar(grammar, corpus, mapping):
 				grammar_string = grammar_string+"\n"
 			grammar_string = grammar_string+grammar[x]+" ->"
 		else:
-			if not grammar[x].isdigit():
+			if not grammar[x].isdigit() and grammar[x]!=' ':
 				grammar_string = grammar_string+" '"+grammar[x]+"'"
 			else:
 				grammar_string = grammar_string+" "+grammar[x]
@@ -101,13 +101,13 @@ mapping = {
 	'T': ['CC', 'DT', 'EX', 'PDT', 'WDT'] # Assign rest to O
 }
 
-# pop = evolution.init_population()
+pop = evolution.init_population()
 
-pop = evolution.init_population_from_file("output_pop")
+# pop = evolution.init_population_from_file("output_pop")
 
 print pop
 
-generation = 0
+generation = 375
 # n_lines_alice = 1091
 # n_lines_random = 246
 n_lines_alice = 30
@@ -177,7 +177,7 @@ while True:
 	print pop
 	json_conv.json_convert(pop, 'output_pop')
 
-	if max_corpus == n_lines_alice:
+	if max_corpus == n_lines_alice and max_rand == 0:
 		print "grammar found"
 		break
 
