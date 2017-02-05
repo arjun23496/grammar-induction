@@ -107,7 +107,7 @@ pop = evolution.init_population()
 
 print pop
 
-generation = 375
+generation = 0
 # n_lines_alice = 1091
 # n_lines_random = 246
 n_lines_alice = 30
@@ -168,7 +168,9 @@ while True:
 
 	print "-----------------Generation Summary------------------------"
 	print "Maximum Corpus"
+	print pop[i_max]['tag']
 	print max_corpus
+	print max_rand
 	print i_max
 	metrics = max_corpus*100/n_lines_alice
 	print "% positive parsed: ",metrics,"%"
@@ -183,5 +185,5 @@ while True:
 
 	# break
 
-	pop = evolution.get_next_generation()
+	pop = evolution.get_next_generation(generation)
 	# print pop
